@@ -1,9 +1,31 @@
-import * as ort from "onnxruntime-web";
+﻿import * as ort from "onnxruntime-web";
+import ortWasmUrl from "../assets/ort-wasm.wasm?url";
+
+console.log("ORT VERSION", ort.version);
+console.log("ORT_WASM_URL", ortWasmUrl);
+
+fetch(ortWasmUrl)
+  .then(r => console.log("WASM FETCH", r.status, r.headers.get("content-type")))
+  .catch(console.error);
+
+ort.env.wasm.wasmPaths = {
+  "ort-wasm.wasm": ortWasmUrl,
+  "ort-wasm-simd.wasm": ortWasmUrl,
+  "ort-wasm-threaded.wasm": ortWasmUrl,
+  "ort-wasm-simd-threaded.wasm": ortWasmUrl,
+};
+
+ort.env.wasm.enableWasmStreaming = false;
+ort.env.wasm.numThreads = 1;
+ort.env.wasm.proxy = false;
+
+
 
 let sessionPromise = null;
 
 async function getSession() {
   if (!sessionPromise) {
+    console.log("Loading ONNX model: /model/baseline.onnx");
     sessionPromise = ort.InferenceSession.create("/model/baseline.onnx", {
       executionProviders: ["wasm"],
     });
@@ -40,11 +62,10 @@ function softmax(logits) {
 export async function predictDigit(float32_28x28) {
   const session = await getSession();
 
-  // IMPORTANT: our ONNX export will use input name "input" and output name "logits"
   const input = new ort.Tensor("float32", float32_28x28, [1, 1, 28, 28]);
   const results = await session.run({ input });
 
-  const logits = results.logits.data; // Float32Array length 10
+  const logits = results.logits.data;
   const { bestIdx, bestProb, probs } = softmax(logits);
 
   return { digit: bestIdx, confidence: bestProb, probs };

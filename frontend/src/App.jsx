@@ -1,20 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import "./styles.css";
+import { canvasToMnistFloat32 } from "./lib/preprocess";
+import { predictDigit } from "./lib/predict";
 
 export default function App() {
   const canvasRef = useRef(null);
   const drawing = useRef(false);
-  const [msg, setMsg] = useState("Draw a digit (0–9), then click Predict.");
+
+  const [status, setStatus] = useState("Ready. Draw a digit then Predict.");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-
-    // Black background
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // White thick strokes
     ctx.lineWidth = 18;
     ctx.lineCap = "round";
     ctx.strokeStyle = "white";
@@ -35,7 +36,6 @@ export default function App() {
     ctx.beginPath();
     ctx.moveTo(x, y);
   }
-
   function onPointerMove(e) {
     if (!drawing.current) return;
     const ctx = canvasRef.current.getContext("2d");
@@ -43,7 +43,6 @@ export default function App() {
     ctx.lineTo(x, y);
     ctx.stroke();
   }
-
   function onPointerUp() {
     drawing.current = false;
   }
@@ -53,17 +52,33 @@ export default function App() {
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    setMsg("Cleared. Draw a digit and click Predict.");
+    setResult(null);
+    setStatus("Cleared.");
   }
 
-  function dummyPredict() {
-    setMsg("not built yet");
+  async function onPredict() {
+    console.log("PREDICT CLICKED");
+    setLoading(true);
+    setResult(null);
+    setStatus("Running inference...");
+
+    try {
+      const x = canvasToMnistFloat32(canvasRef.current);
+      const pred = await predictDigit(x);
+      setResult(pred);
+      setStatus("Done.");
+    } catch (e) {
+      console.error(e);
+      setStatus("Prediction failed — check Console for details.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="wrap">
       <h1>Digit Classifier (0–9)</h1>
-      <p className="sub">Runs in-browser .</p>
+      <p className="sub">In-browser ONNX inference (no backend).</p>
 
       <div className="card">
         <canvas
@@ -79,10 +94,24 @@ export default function App() {
 
         <div className="controls">
           <button onClick={clearCanvas}>Clear</button>
-          <button onClick={dummyPredict}>Predict</button>
+          <button onClick={onPredict} disabled={loading}>
+            {loading ? "Predicting..." : "Predict"}
+          </button>
         </div>
 
-        <div className="result">{msg}</div>
+        <div className="result">
+          <div className="small">Status: {status}</div>
+          {result && (
+            <>
+              <div className="big">
+                Prediction: <span>{result.digit}</span>
+              </div>
+              <div className="small">
+                Confidence: {(result.confidence * 100).toFixed(1)}%
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

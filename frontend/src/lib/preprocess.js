@@ -12,12 +12,10 @@ export function canvasToMnistFloat32(canvas) {
 
   const img = ctx.getImageData(0, 0, targetSize, targetSize).data;
 
-  
   const out = new Float32Array(targetSize * targetSize);
   for (let i = 0; i < targetSize * targetSize; i++) {
     const r = img[i * 4]; // 0..255
-    out[i] = r / 255.0;   // 0..1
+    out[i] = r / 255.0;
   }
-
-  return out; // will be shaped 1,1,28,28 later
+  return out;
 }
